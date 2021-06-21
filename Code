@@ -1,0 +1,116 @@
+from googlesearch import search
+import pandas as pd
+import time
+import random
+import urllib
+import regex as re
+import requests
+from collections import deque
+import numpy as np
+from urllib.parse import urlsplit
+from bs4 import BeautifulSoup
+import urllib3
+
+# import a list of things to search
+with open('C:/Users/j/Desktop/querylist.csv', 'r') as q:
+    for line in q:
+        query = f"{line} whatever you'd like -yelp -facebook" \
+                f" -booking -usnews"
+        # second query is possible to add
+        query1 = f" scraping {line} second"
+        url_list = []
+        print(f"Scraping google results for visit, city, chamber of {line} Mississipi")
+        wt = random.randint(30, 60)
+        np = random.randint(15, 45)
+        # change num and stop for results desired per query
+        for j in search(query, tld='com', lang='en', tbs='0', safe='off', num=5, start=0, stop=5, pause=wt):
+            url_list.append(j)
+        for i in search(query1, tld='com', lang='en', tbs='0', safe='off', num=1, start=0, stop=1, pause=np):
+            url_list.append(i)
+            print(f"Scraping google results visit {line} Mississipi")
+        df = pd.DataFrame(url_list, columns=['URL'])
+        df['City'] = line
+        # write the file to your desktop
+        df.to_csv(r'\Users\j\Desktop\google_urls.csv', index=False, mode='a')
+        time.sleep(random.randint(5, 15))
+
+# optional cleaning
+# cuts down on later scraping time
+# writing badURLlist well depends on the type of queries you are making and is purely subjective
+scrapedurls = list(open(r'C:/Users/j/Desktop/google_urls.csv'))
+df1 = pd.DataFrame()
+df1['protocol'], d1f['domain'], df1['path'], df1['query'], df1['fragment'] = zip(*[urllib.parse.urlsplit(x) for x in scrapedurls])
+df2 = df1.drop_duplicates(subset='domain')
+prob_bad = list(open(r'C:/Users/j/Desktop/badurlparts.csv'))
+badURLlist = [x.strip("\n") for x in prob_bad]
+df3 = df2[~df2.domain.str.contains('|'.join(badURLlist))]
+df4 = df3.assign(url=df3.protocol.astype(str) + "://" + df3.domain.astype(str))
+df5 = df4['url']
+df5.to_csv('C:/Users/j/Desktop/cleaned_urls.csv', index=False)
+
+# Function to scrape emails
+
+def em_scrape(u):
+    # defines url to scrape
+    og_url = str(u)
+    unscraped = deque([og_url])
+    scraped = set()
+    emails = set()
+
+    while len(unscraped) < 500:
+        try:
+            url = unscraped.popleft()
+        except IndexError:
+            break
+        scraped.add(url)
+        parts = urlsplit(url)
+        base_url = "{0.scheme}://{0.netloc}".format(parts)
+        if '/' in parts.path:
+            path = url[:url.rfind('/')+1]
+        else:
+            path = url
+
+        print("Crawling URL %s" % url)
+        try:
+            response = requests.get(url)
+        except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError, requests.exceptions.FileModeWarning,
+                requests.exceptions.InvalidSchema, requests.exceptions.ContentDecodingError,
+                requests.exceptions.TooManyRedirects):
+            continue
+        except (urllib3.exceptions.LocationParseError, requests.exceptions.InvalidURL):
+            break
+        new_emails = set(re.findall(r"[a-z0-9\.\-+_]+@[a-z0-9\.\-+_]+\.[a-z]+", response.text, re.I))
+        emails.update(new_emails)
+        soup = BeautifulSoup(response.text, "lxml")
+
+        for anchor in soup.find_all("a"):
+            if "href" in anchor.attrs:
+                link = anchor.attrs["href"]
+            else:
+                link = ''
+                if link.startswith('/'):
+                    link = base_url + link
+                elif not link.startswith('http'):
+                    link = path + link
+            if not link.endswith(".gz"):
+                if not link in unscraped and not link in scraped:
+                    unscraped.append(link)
+
+    domainfrom = [og_url for x in range(len(emails))]
+    # creates a data frame of scraped emails and where they were gathered.
+    df8 = pd.DataFrame(emails, columns=["Email"])
+    df8['From Domain'] = domainfrom
+    df8.to_csv(r'\Users\j\Desktop\scraped_emails.csv', index=False, mode='a')
+    # you can reword scraped_email.csv to anything
+
+
+# Open a list of URLs and parses through
+# If you get an error, check to make sure there's no obviously bad URLs or adjust badurlparts 
+with open('C:/Users/j/Desktop/cleaned_urls.csv', 'r') as f:
+    lines = f.read().splitlines()
+    list(lines)
+index = 0
+while index < len(lines):
+    em_scrape(lines[index])
+    index += 1
