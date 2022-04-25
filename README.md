@@ -19,3 +19,4 @@ Third, choose where you want to write the files to. A simple naming convention i
 
 Let me know if you have any suggestions for improvements or otherwise. Thank you for checking it out!
 
+  [![HitCount](https://hits.dwyl.com/j-mcelwee/EmailsFromGoogleUrls.svg?style=flat-square)](http://hits.dwyl.com/j-mcelwee/EmailsFromGoogleUrls)
